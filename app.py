@@ -204,8 +204,8 @@ def main():
             resultados[t] = obtener_datos_financieros(t)
             progress_bar.progress((i + 1) / len(tickers))
             
-            # Pausa de 1 segundo entre cada solicitud para evitar bloqueo
-            time.sleep(1)  # Evita bloqueo por demasiadas consultas
+            # Pausa de 0.5 segundos entre cada solicitud para evitar bloqueo
+            time.sleep(0.5)  # Evita bloqueo por demasiadas consultas
         
         status_text.text("✅ Análisis completado!")
         status_text.empty()
