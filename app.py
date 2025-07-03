@@ -33,18 +33,14 @@ def calcular_wacc(info, balance_sheet):
         total_debt = lt_debt + st_debt
         
         Re = Rf + beta * (Rm - Rf)  # Costo de capital
-        Rd = 0.055  # Se optimizó en función de la deuda
-
+        Rd = 0.055 if total_debt > 0 else 0  # Costo de deuda
+        
         E = market_cap  # Valor de mercado del equity
         D = total_debt  # Valor de mercado de la deuda
 
         if None in [Re, E, D] or E + D == 0:
             return None, total_debt
 
-        # Ajuste de Rd en función del tamaño de la deuda
-        if D > 0:
-            Rd = 0.05 if D < 1_000_000_000 else 0.06
-        
         wacc = (E / (E + D)) * Re + (D / (E + D)) * Rd * (1 - Tc)
         return wacc, total_debt
     except Exception as e:
@@ -81,44 +77,38 @@ def obtener_datos_financieros(ticker):
         cf = stock.cashflow
 
         # Datos básicos
-        price = info.get("currentPrice", None)
+        price = info.get("currentPrice")
         name = info.get("longName", ticker)
         sector = info.get("sector", "N/D")
         country = info.get("country", "N/D")
         industry = info.get("industry", "N/D")
 
         # Ratios de valoración
-        pe = info.get("trailingPE", None)
-        pb = info.get("priceToBook", None)
-        dividend_est = info.get("dividendRate", None)  # Dividend Est.
-        dividend_ttm = info.get("dividendYield", None)  # Dividend TTM
-        
-        # Cálculo de Dividend Est. y Dividend TTM como valores en dólares y porcentaje
-        dividend_est_dollars = dividend_est if dividend_est else None  # Estimación en dólares por acción
-        dividend_est_percent = (dividend_est / price) * 100 if dividend_est and price else None  # Estimación en porcentaje
-        
-        dividend_ttm_dollars = dividend_ttm * price if dividend_ttm and price else None  # Último dividendo en dólares por acción
-        dividend_ttm_percent = (dividend_ttm / price) * 100 if dividend_ttm and price else None  # Rendimiento por dividendo TTM en porcentaje
+        pe = info.get("trailingPE")
+        pb = info.get("priceToBook")
+        dividend = info.get("dividendRate")
+        dividend_yield = info.get("dividendYield")
+        payout = info.get("payoutRatio")
         
         # Ratios de rentabilidad
-        roa = info.get("returnOnAssets", None)
-        roe = info.get("returnOnEquity", None)
+        roa = info.get("returnOnAssets")
+        roe = info.get("returnOnEquity")
         
         # Ratios de liquidez
-        current_ratio = info.get("currentRatio", None)
-        quick_ratio = info.get("quickRatio", None)
+        current_ratio = info.get("currentRatio")
+        quick_ratio = info.get("quickRatio")
         
         # Ratios de deuda
-        ltde = info.get("longTermDebtToEquity", None)
-        de = info.get("debtToEquity", None)
+        ltde = info.get("longTermDebtToEquity")
+        de = info.get("debtToEquity")
         
         # Margenes
-        op_margin = info.get("operatingMargins", None)
-        profit_margin = info.get("profitMargins", None)
+        op_margin = info.get("operatingMargins")
+        profit_margin = info.get("profitMargins")
         
         # Flujo de caja
         fcf = cf.loc["Free Cash Flow"].iloc[0] if "Free Cash Flow" in cf.index else None
-        shares = info.get("sharesOutstanding", None)
+        shares = info.get("sharesOutstanding")
         pfcf = price / (fcf / shares) if fcf and shares else None
         
         # Cálculos avanzados
@@ -135,7 +125,7 @@ def obtener_datos_financieros(ticker):
         fcf_growth = calcular_crecimiento_historico(cf, "Free Cash Flow") or calcular_crecimiento_historico(cf, "Operating Cash Flow")
         
         # Liquidez avanzada
-        cash_ratio = info.get("cashRatio", None)
+        cash_ratio = info.get("cashRatio")
         operating_cash_flow = cf.loc["Operating Cash Flow"].iloc[0] if "Operating Cash Flow" in cf.index else None
         current_liabilities = bs.loc["Total Current Liabilities"].iloc[0] if "Total Current Liabilities" in bs.index else None
         cash_flow_ratio = operating_cash_flow / current_liabilities if operating_cash_flow and current_liabilities else None
@@ -150,10 +140,9 @@ def obtener_datos_financieros(ticker):
             "P/E": pe,
             "P/B": pb,
             "P/FCF": pfcf,
-            "Dividend Est. (USD)": dividend_est_dollars,  # Valor en dólares del dividendo estimado
-            "Dividend Est. (%)": dividend_est_percent,  # Estimación de rendimiento por dividendo en porcentaje
-            "Dividend TTM (USD)": dividend_ttm_dollars,  # Último dividendo en dólares
-            "Dividend TTM (%)": dividend_ttm_percent,  # Rendimiento TTM en porcentaje
+            "Dividend Year": dividend,
+            "Dividend Yield %": dividend_yield,
+            "Payout Ratio": payout,
             "ROA": roa,
             "ROE": roe,
             "Current Ratio": current_ratio,
@@ -178,22 +167,6 @@ def obtener_datos_financieros(ticker):
     except Exception as e:
         return {"Ticker": ticker, "Error": str(e)}
 
-# Función para formatear columnas
-def formatear_columnas(df):
-    # Formatear valores numéricos
-    df["Precio"] = df["Precio"].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "N/D")
-    
-    # Formatear columnas en dólares y porcentuales
-    dividend_columns = ["Dividend Est. (USD)", "Dividend Est. (%)", "Dividend TTM (USD)", "Dividend TTM (%)"]
-    for col in dividend_columns:
-        if col in df.columns:
-            if "USD" in col:
-                df[col] = df[col].apply(lambda x: f"${x:,.2f}" if pd.notnull(x) else "N/D")
-            elif "%" in col:
-                df[col] = df[col].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "N/D")
-    
-    return df
-
 # Interfaz de usuario
 def main():
     st.title("📊 Dashboard de Análisis Financiero Avanzado")
@@ -206,7 +179,7 @@ def main():
             "AAPL, MSFT, GOOGL, AMZN, TSLA",
             help="Ejemplo: AAPL, MSFT, GOOG"
         )
-        max_tickers = st.slider("Número máximo de tickers", 1, 10, 50, 100)
+        max_tickers = st.slider("Número máximo de tickers", 1, 50, 10)
         
         st.markdown("---")
         st.markdown("**Parámetros WACC**")
@@ -249,22 +222,25 @@ def main():
                 return
                 
             df = pd.DataFrame(datos_validos)
-            df = formatear_columnas(df)
             
             # Sección 1: Resumen General
             st.header("📋 Resumen General")
-
-           # Formatear columnas porcentuales
+            
+            # Formatear columnas porcentuales
             porcentajes = ["Dividend Yield %", "ROA", "ROE", "Oper Margin", "Profit Margin", "WACC", "ROIC", "EVA"]
             for col in porcentajes:
                 if col in df.columns:
                     df[col] = df[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/D")
             
+            # Definir el orden de las columnas
             columnas_mostrar = [
                 "Ticker", "Nombre", "Sector", "Precio", "P/E", "P/B", "P/FCF", 
-                "Dividend Yield %", "ROE", "Debt/Eq", "Profit Margin", "WACC", "ROIC"
+                "Dividend Year", "Dividend Yield %", "Payout Ratio", "ROA", "ROE", 
+                "Current Ratio", "Quick Ratio", "LtDebt/Eq", "Debt/Eq", "Oper Margin", 
+                "Profit Margin", "WACC", "ROIC", "EVA"
             ]
             
+            # Mostrar el dataframe con las columnas en el orden adecuado
             st.dataframe(
                 df[columnas_mostrar].dropna(how='all', axis=1),
                 use_container_width=True,
