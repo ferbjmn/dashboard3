@@ -87,7 +87,6 @@ def obtener_datos_financieros(ticker):
         pe = info.get("trailingPE")
         pb = info.get("priceToBook")
         dividend = info.get("dividendRate")
-        dividend_yield = info.get("dividendYield")
         payout = info.get("payoutRatio")
         
         # Ratios de rentabilidad
@@ -140,8 +139,7 @@ def obtener_datos_financieros(ticker):
             "P/E": pe,
             "P/B": pb,
             "P/FCF": pfcf,
-            "Dividend Year": dividend,
-            "Dividend Yield %": dividend_yield,
+            "Dividend Est.": dividend,
             "Payout Ratio": payout,
             "ROA": roa,
             "ROE": roe,
@@ -227,19 +225,19 @@ def main():
             st.header("📋 Resumen General")
             
             # Formatear columnas porcentuales
-            porcentajes = ["Dividend Yield %", "ROA", "ROE", "Oper Margin", "Profit Margin", "WACC", "ROIC", "EVA"]
+            porcentajes = ["Dividend Est.", "ROA", "ROE", "Oper Margin", "Profit Margin", "WACC", "ROIC", "EVA"]
             for col in porcentajes:
                 if col in df.columns:
                     df[col] = df[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/D")
-            
+    
             # Definir el orden de las columnas
             columnas_mostrar = [
                 "Ticker", "Nombre", "Sector", "Precio", "P/E", "P/B", "P/FCF", 
-                "Dividend Year", "Dividend Yield %", "Payout Ratio", "ROA", "ROE", 
-                "Current Ratio", "Quick Ratio", "LtDebt/Eq", "Debt/Eq", "Oper Margin", 
-                "Profit Margin", "WACC", "ROIC", "EVA"
+                "Dividend Est.", "Payout Ratio", "ROA", "ROE", "Current Ratio", 
+                "Quick Ratio", "LtDebt/Eq", "Debt/Eq", "Oper Margin", "Profit Margin", 
+                "WACC", "ROIC", "EVA"
             ]
-            
+    
             # Mostrar el dataframe con las columnas en el orden adecuado
             st.dataframe(
                 df[columnas_mostrar].dropna(how='all', axis=1),
@@ -264,12 +262,12 @@ def main():
             with col2:
                 st.subheader("Dividendos")
                 fig, ax = plt.subplots(figsize=(10, 4))
-                df_plot = df[["Ticker", "Dividend Yield %"]].set_index("Ticker")
-                df_plot["Dividend Yield %"] = df_plot["Dividend Yield %"].replace("N/D", 0)
-                df_plot["Dividend Yield %"] = df_plot["Dividend Yield %"].str.rstrip("%").astype("float")
+                df_plot = df[["Ticker", "Dividend Est."]].set_index("Ticker")
+                df_plot["Dividend Est."] = df_plot["Dividend Est."].replace("N/D", 0)
+                df_plot["Dividend Est."] = df_plot["Dividend Est."].astype("float")
                 df_plot.plot(kind="bar", ax=ax, rot=45, color="green")
-                ax.set_title("Rendimiento de Dividendos (%)")
-                ax.set_ylabel("Dividend Yield %")
+                ax.set_title("Rendimiento de Dividendos Estimados")
+                ax.set_ylabel("Dividend Est.")
                 st.pyplot(fig)
                 plt.close()
             
@@ -384,7 +382,7 @@ def main():
             with col3:
                 st.metric("Deuda/Patrimonio", empresa['Debt/Eq'])
                 st.metric("Margen Neto", empresa['Profit Margin'])
-                st.metric("Dividend Yield", empresa['Dividend Yield %'])
+                st.metric("Dividend Est.", empresa['Dividend Est.'])
             
             # Gráfico de creación de valor individual
             st.subheader("Creación de Valor")
