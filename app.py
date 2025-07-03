@@ -104,7 +104,7 @@ def obtener_datos_financieros(ticker):
         payout = info.get("payoutRatio")
         
         # Dividend Est. en formato de número
-        dividend_est = dividend if dividend else 0
+        dividend_est = dividend if isinstance(dividend, (int, float)) else 0  # Validación para asegurar que es un número
 
         # Ratios de rentabilidad
         roa = info.get("returnOnAssets")
@@ -114,7 +114,7 @@ def obtener_datos_financieros(ticker):
         current_ratio = info.get("currentRatio")
         quick_ratio = info.get("quickRatio")
         
-        # Margenes
+        # Márgenes
         op_margin = info.get("operatingMargins")
         profit_margin = info.get("profitMargins")
         
