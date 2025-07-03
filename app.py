@@ -201,10 +201,8 @@ def main():
             status_text.text(f"⏳ Procesando {t} ({i+1}/{len(tickers)})...")
             resultados[t] = obtener_datos_financieros(t)
             progress_bar.progress((i + 1) / len(tickers))
-            time.sleep(1)  # Para evitar bloqueos de la API
             
         status_text.text("✅ Análisis completado!")
-        time.sleep(0.5)
         status_text.empty()
         progress_bar.empty()
         
