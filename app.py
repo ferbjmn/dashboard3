@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
+import time  # Importamos time para la pausa
 
 def redondear_y_formatear(valor, es_porcentaje=False):
     """Redondear los valores y formatearlos como porcentaje si es necesario"""
@@ -197,11 +198,15 @@ def main():
         progress_bar = st.progress(0)
         status_text = st.empty()
         
+        # Ciclo de procesamiento de tickers
         for i, t in enumerate(tickers):
             status_text.text(f"⏳ Procesando {t} ({i+1}/{len(tickers)})...")
             resultados[t] = obtener_datos_financieros(t)
             progress_bar.progress((i + 1) / len(tickers))
             
+            # Pausa de 1 segundo entre cada solicitud para evitar bloqueo
+            time.sleep(1)  # Evita bloqueo por demasiadas consultas
+        
         status_text.text("✅ Análisis completado!")
         status_text.empty()
         progress_bar.empty()
