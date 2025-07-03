@@ -68,6 +68,18 @@ def calcular_crecimiento_historico(financials, metric):
     except:
         return None
 
+def redondear_y_formatear(valor, es_porcentaje=False):
+    """Redondear los valores y formatearlos como porcentaje si es necesario"""
+    try:
+        if valor is None:
+            return "N/D"
+        if es_porcentaje:
+            return f"{round(valor * 100, 2):.2f}%"  # Formato porcentaje
+        else:
+            return round(valor, 2)  # Redondeo para valores decimales
+    except:
+        return valor
+
 def obtener_datos_financieros(ticker):
     try:
         stock = yf.Ticker(ticker)
@@ -89,7 +101,7 @@ def obtener_datos_financieros(ticker):
         dividend = info.get("dividendRate")
         payout = info.get("payoutRatio")
         
-        # Dividendo Estimado: Usamos el dividendo anual estimado si está disponible
+        # Dividend Est. en formato de número
         dividend_est = dividend if dividend else 0  # Si no está disponible, asignamos 0
 
         # Ratios de rentabilidad
@@ -132,38 +144,39 @@ def obtener_datos_financieros(ticker):
         current_liabilities = bs.loc["Total Current Liabilities"].iloc[0] if "Total Current Liabilities" in bs.index else None
         cash_flow_ratio = operating_cash_flow / current_liabilities if operating_cash_flow and current_liabilities else None
         
+        # Redondear los valores numéricos a dos decimales
         return {
             "Ticker": ticker,
             "Nombre": name,
             "Sector": sector,
             "País": country,
             "Industria": industry,
-            "Precio": price,
-            "P/E": pe,
-            "P/B": pb,
-            "P/FCF": pfcf,
-            "Dividend Est.": dividend_est,  # Mostrar el dividendo estimado
-            "Payout Ratio": payout,
-            "ROA": roa,
-            "ROE": roe,
-            "Current Ratio": current_ratio,
-            "Quick Ratio": quick_ratio,
-            "LtDebt/Eq": ltde,
-            "Debt/Eq": de,
-            "Oper Margin": op_margin,
-            "Profit Margin": profit_margin,
-            "WACC": wacc,
-            "ROIC": roic,
-            "EVA": eva,
-            "Deuda Total": total_debt,
-            "Patrimonio Neto": equity,
-            "Revenue Growth": revenue_growth,
-            "EPS Growth": eps_growth,
-            "FCF Growth": fcf_growth,
-            "Cash Ratio": cash_ratio,
-            "Cash Flow Ratio": cash_flow_ratio,
-            "Operating Cash Flow": operating_cash_flow,
-            "Current Liabilities": current_liabilities,
+            "Precio": redondear_y_formatear(price),
+            "P/E": redondear_y_formatear(pe),
+            "P/B": redondear_y_formatear(pb),
+            "P/FCF": redondear_y_formatear(pfcf),
+            "Dividend Est.": redondear_y_formatear(dividend_est),
+            "Payout Ratio": redondear_y_formatear(payout, True),  # Formato porcentaje
+            "ROA": redondear_y_formatear(roa, True),
+            "ROE": redondear_y_formatear(roe, True),
+            "Current Ratio": redondear_y_formatear(current_ratio),
+            "Quick Ratio": redondear_y_formatear(quick_ratio),
+            "LtDebt/Eq": redondear_y_formatear(ltde),
+            "Debt/Eq": redondear_y_formatear(de),
+            "Oper Margin": redondear_y_formatear(op_margin, True),
+            "Profit Margin": redondear_y_formatear(profit_margin, True),
+            "WACC": redondear_y_formatear(wacc, True),
+            "ROIC": redondear_y_formatear(roic, True),
+            "EVA": redondear_y_formatear(eva),
+            "Deuda Total": redondear_y_formatear(total_debt),
+            "Patrimonio Neto": redondear_y_formatear(equity),
+            "Revenue Growth": redondear_y_formatear(revenue_growth, True),
+            "EPS Growth": redondear_y_formatear(eps_growth, True),
+            "FCF Growth": redondear_y_formatear(fcf_growth, True),
+            "Cash Ratio": redondear_y_formatear(cash_ratio),
+            "Cash Flow Ratio": redondear_y_formatear(cash_flow_ratio),
+            "Operating Cash Flow": redondear_y_formatear(operating_cash_flow),
+            "Current Liabilities": redondear_y_formatear(current_liabilities),
         }
     except Exception as e:
         return {"Ticker": ticker, "Error": str(e)}
@@ -228,7 +241,7 @@ def main():
             st.header("📋 Resumen General")
             
             # Formatear columnas porcentuales
-            porcentajes = ["Dividend Est.", "ROA", "ROE", "Oper Margin", "Profit Margin", "WACC", "ROIC", "EVA"]
+            porcentajes = ["Dividend Est.", "Payout Ratio", "ROA", "ROE", "Oper Margin", "Profit Margin", "WACC", "ROIC", "EVA"]
             for col in porcentajes:
                 if col in df.columns:
                     df[col] = df[col].apply(lambda x: f"{x:.2%}" if pd.notnull(x) else "N/D")
