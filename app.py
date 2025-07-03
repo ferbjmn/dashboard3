@@ -89,6 +89,9 @@ def obtener_datos_financieros(ticker):
         dividend = info.get("dividendRate")
         payout = info.get("payoutRatio")
         
+        # Dividendo Estimado: Usamos el dividendo anual estimado si está disponible
+        dividend_est = dividend if dividend else 0  # Si no está disponible, asignamos 0
+
         # Ratios de rentabilidad
         roa = info.get("returnOnAssets")
         roe = info.get("returnOnEquity")
@@ -139,7 +142,7 @@ def obtener_datos_financieros(ticker):
             "P/E": pe,
             "P/B": pb,
             "P/FCF": pfcf,
-            "Dividend Est.": dividend,
+            "Dividend Est.": dividend_est,  # Mostrar el dividendo estimado
             "Payout Ratio": payout,
             "ROA": roa,
             "ROE": roe,
