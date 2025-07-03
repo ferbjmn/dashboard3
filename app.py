@@ -2,40 +2,56 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import time  # Importamos time para la pausa
+import matplotlib.pyplot as plt  # Aseguramos que matplotlib esté importado
+
+# Definir la función de cálculo del crecimiento histórico
+def calcular_crecimiento_historico(financials, metric):
+    try:
+        if metric not in financials.index:
+            return None
+        
+        datos = financials.loc[metric].dropna().iloc[:4]  # Últimos 4 periodos
+        if len(datos) < 2:
+            return None
+        
+        primer_valor = datos.iloc[-1]
+        ultimo_valor = datos.iloc[0]
+        años = len(datos) - 1
+        
+        if primer_valor == 0:
+            return None
+        
+        cagr = (ultimo_valor / primer_valor) ** (1 / años) - 1
+        return cagr
+    except Exception as e:
+        return None
 
 def redondear_y_formatear(valor, es_porcentaje=False):
     """Redondear los valores y formatearlos como porcentaje si es necesario"""
     try:
-        # Verificar si el valor es nulo o no es un número
         if valor is None or valor == "N/D":
             return "N/D"
         
-        # Si es porcentaje, lo convertimos en formato porcentaje
         if es_porcentaje:
-            if isinstance(valor, (int, float)):  # Verificamos que el valor sea numérico
+            if isinstance(valor, (int, float)):
                 return f"{round(valor * 100, 2):.2f}%"  # Formato porcentaje
             else:
                 return "N/D"  # Si no es numérico, devolvemos "N/D"
         else:
-            # Redondeo para valores decimales
             return round(valor, 2) if isinstance(valor, (int, float)) else "N/D"
     except Exception as e:
         return "N/D"
 
 def calcular_wacc_y_roic(ticker):
-    """
-    Calcula el WACC y el ROIC de una empresa usando únicamente datos de yfinance,
-    e incluye una evaluación de si la empresa está creando valor (Relación ROIC-WACC).
-    """
     try:
         empresa = yf.Ticker(ticker)
         
         # Información básica
         market_cap = empresa.info.get('marketCap', 0)  # Capitalización de mercado (valor de mercado del patrimonio)
         beta = empresa.info.get('beta', 1)  # Beta de la empresa
-        rf = 0.02  # Tasa libre de riesgo (asumida como 2%)
-        equity_risk_premium = 0.05  # Prima de riesgo del mercado (asumida como 5%)
-        ke = rf + beta * equity_risk_premium  # Costo del capital accionario (CAPM)
+        rf = 0.02  # Tasa libre de riesgo
+        equity_risk_premium = 0.05  # Prima de riesgo
+        ke = rf + beta * equity_risk_premium
         
         balance_general = empresa.balance_sheet
         deuda_total = balance_general.loc['Total Debt'].iloc[0] if 'Total Debt' in balance_general.index else 0
@@ -48,26 +64,19 @@ def calcular_wacc_y_roic(ticker):
         impuestos = estado_resultados.loc['Income Tax Expense'].iloc[0] if 'Income Tax Expense' in estado_resultados.index else 0
         ebit = estado_resultados.loc['EBIT'].iloc[0] if 'EBIT' in estado_resultados.index else 0
 
-        # Calcular Kd (costo de la deuda)
         kd = gastos_intereses / deuda_total if deuda_total != 0 else 0
-
-        # Calcular tasa de impuestos efectiva
-        tasa_impuestos = impuestos / ebt if ebt != 0 else 0.21  # Asume 21% si no hay datos
+        tasa_impuestos = impuestos / ebt if ebt != 0 else 0.21
         
-        # Calcular WACC
         total_capital = market_cap + deuda_total
         wacc = ((market_cap / total_capital) * ke) + ((deuda_total / total_capital) * kd * (1 - tasa_impuestos))
         
-        # Calcular ROIC
-        nopat = ebit * (1 - tasa_impuestos)  # NOPAT
-        capital_invertido = patrimonio + (deuda_total - efectivo)  # Capital Invertido
+        nopat = ebit * (1 - tasa_impuestos)
+        capital_invertido = patrimonio + (deuda_total - efectivo)
         roic = nopat / capital_invertido if capital_invertido != 0 else 0
         
-        # Calcular Relación ROIC-WACC
         diferencia_roic_wacc = roic - wacc
-        creando_valor = roic > wacc  # Determina si está creando valor
-
-        # Mostrar resultados
+        creando_valor = roic > wacc
+        
         return wacc, roic, creando_valor
     except Exception as e:
         st.error(f"Error al calcular WACC y ROIC para {ticker.upper()}: {e}")
@@ -95,7 +104,7 @@ def obtener_datos_financieros(ticker):
         payout = info.get("payoutRatio")
         
         # Dividend Est. en formato de número
-        dividend_est = dividend if dividend else 0  # Si no está disponible, asignamos 0
+        dividend_est = dividend if dividend else 0
 
         # Ratios de rentabilidad
         roa = info.get("returnOnAssets")
@@ -128,7 +137,6 @@ def obtener_datos_financieros(ticker):
         current_liabilities = bs.loc["Total Current Liabilities"].iloc[0] if "Total Current Liabilities" in bs.index else None
         cash_flow_ratio = operating_cash_flow / current_liabilities if operating_cash_flow and current_liabilities else None
         
-        # Redondear los valores numéricos a dos decimales
         return {
             "Ticker": ticker,
             "Nombre": name,
@@ -145,22 +153,11 @@ def obtener_datos_financieros(ticker):
             "ROE": redondear_y_formatear(roe, True),
             "Current Ratio": redondear_y_formatear(current_ratio),
             "Quick Ratio": redondear_y_formatear(quick_ratio),
-            "LtDebt/Eq": redondear_y_formatear(ltde),
-            "Debt/Eq": redondear_y_formatear(de),
             "Oper Margin": redondear_y_formatear(op_margin, True),
             "Profit Margin": redondear_y_formatear(profit_margin, True),
             "WACC": redondear_y_formatear(wacc, True),
-            "ROIC": redondear_y_formatear(roic, True),  # Ajuste para ROIC
-            "EVA": redondear_y_formatear("N/D" if not creando_valor else "Creando Valor"),  # EVA dependerá de ROIC
-            "Deuda Total": redondear_y_formatear(total_debt),
-            "Patrimonio Neto": redondear_y_formatear(patrimonio),
-            "Revenue Growth": redondear_y_formatear(revenue_growth, True),
-            "EPS Growth": redondear_y_formatear(eps_growth, True),
-            "FCF Growth": redondear_y_formatear(fcf_growth, True),
-            "Cash Ratio": redondear_y_formatear(cash_ratio),
-            "Cash Flow Ratio": redondear_y_formatear(cash_flow_ratio),
-            "Operating Cash Flow": redondear_y_formatear(operating_cash_flow),
-            "Current Liabilities": redondear_y_formatear(current_liabilities),
+            "ROIC": redondear_y_formatear(roic, True),
+            "EVA": redondear_y_formatear("N/D" if not creando_valor else "Creando Valor"),
         }
     except Exception as e:
         return {"Ticker": ticker, "Error": str(e)}
@@ -169,7 +166,6 @@ def obtener_datos_financieros(ticker):
 def main():
     st.title("📊 Dashboard de Análisis Financiero Avanzado")
     
-    # Sidebar con configuración
     with st.sidebar:
         st.header("⚙️ Configuración")
         tickers_input = st.text_area(
@@ -186,7 +182,6 @@ def main():
         Rm = st.number_input("Retorno esperado del mercado (%)", min_value=0.0, max_value=30.0, value=8.5) / 100
         Tc = st.number_input("Tasa impositiva corporativa (%)", min_value=0.0, max_value=50.0, value=21.0) / 100
     
-    # Procesamiento de tickers
     tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()][:max_tickers]
     
     if st.button("🔍 Analizar Acciones", type="primary"):
@@ -198,24 +193,18 @@ def main():
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        # Ciclo de procesamiento de tickers
         for i, t in enumerate(tickers):
             status_text.text(f"⏳ Procesando {t} ({i+1}/{len(tickers)})...")
             resultados[t] = obtener_datos_financieros(t)
             progress_bar.progress((i + 1) / len(tickers))
-            
-            # Pausa de 0.5 segundos entre cada solicitud para evitar bloqueo
-            time.sleep(0.5)  # Evita bloqueo por demasiadas consultas
+            time.sleep(0.5)  # Pausa de 0.5 segundos
         
         status_text.text("✅ Análisis completado!")
         status_text.empty()
         progress_bar.empty()
         
-        # Mostrar resultados
         if resultados:
             datos = list(resultados.values())
-            
-            # Filtramos empresas con errores
             datos_validos = [d for d in datos if "Error" not in d]
             if not datos_validos:
                 st.error("No se pudo obtener datos válidos para ningún ticker")
@@ -226,27 +215,20 @@ def main():
             # Sección 1: Resumen General
             st.header("📋 Resumen General")
             
-            # Formatear columnas porcentuales
             porcentajes = ["Dividend Est.", "Payout Ratio", "ROA", "ROE", "Oper Margin", "Profit Margin", "WACC", "ROIC", "EVA"]
             for col in porcentajes:
                 if col in df.columns:
                     df[col] = df[col].apply(lambda x: redondear_y_formatear(x, True) if pd.notnull(x) else "N/D")
-    
-            # Definir el orden de las columnas
+            
             columnas_mostrar = [
                 "Ticker", "Nombre", "Sector", "Precio", "P/E", "P/B", "P/FCF", 
                 "Dividend Est.", "Payout Ratio", "ROA", "ROE", "Current Ratio", 
-                "Quick Ratio", "LtDebt/Eq", "Debt/Eq", "Oper Margin", "Profit Margin", 
+                "Quick Ratio", "Oper Margin", "Profit Margin", 
                 "WACC", "ROIC", "EVA"
             ]
-    
-            # Mostrar el dataframe con las columnas en el orden adecuado
-            st.dataframe(
-                df[columnas_mostrar].dropna(how='all', axis=1),
-                use_container_width=True,
-                height=400
-            )
             
+            st.dataframe(df[columnas_mostrar].dropna(how='all', axis=1), use_container_width=True, height=400)
+
             # Sección 2: Análisis de Valoración
             st.header("💰 Análisis de Valoración")
             col1, col2 = st.columns(2)
@@ -272,10 +254,9 @@ def main():
                 ax.set_ylabel("Dividend Est.")
                 st.pyplot(fig)
                 plt.close()
-            
+
             # Sección 3: Rentabilidad y Eficiencia
             st.header("📈 Rentabilidad y Eficiencia")
-            
             tabs = st.tabs(["ROE vs ROA", "Margenes", "WACC vs ROIC"])
             
             with tabs[0]:
@@ -345,7 +326,7 @@ def main():
                 ax.set_ylabel("Ratio")
                 st.pyplot(fig)
                 plt.close()
-            
+
             # Sección 5: Crecimiento
             st.header("🚀 Crecimiento Histórico")
             
