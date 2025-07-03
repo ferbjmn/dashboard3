@@ -71,7 +71,7 @@ def calcular_crecimiento_historico(financials, metric):
 def redondear_y_formatear(valor, es_porcentaje=False):
     """Redondear los valores y formatearlos como porcentaje si es necesario"""
     try:
-        if valor is None:
+        if valor is None or valor == "N/D":
             return "N/D"
         if es_porcentaje:
             return f"{round(valor * 100, 2):.2f}%"  # Formato porcentaje
